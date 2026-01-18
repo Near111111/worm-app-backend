@@ -3,3 +3,18 @@ Para mag run boi
 2. uvicorn app.main:app --reload  (Eto yung pag rurun mo sya)
 
 Note: Try mo lang muna display sa frontend mo yung camera boi yung live stream naka ready na lahat yan yung ibang services ako na bahala display mo lang muna sya.
+
+Example use to front end 
+
+1. const ws = new WebSocket("ws://BACKEND_IP:8000/ws/camera");
+
+2. ws.onmessage = (event) => {
+const base64Frame = event.data;
+
+  setImageUri(`data:image/jpeg;base64,${base64Frame}`);
+};
+
+3.<Image
+  source={{ uri: imageUri }}
+  style={{ width: 320, height: 240 }}
+/>
