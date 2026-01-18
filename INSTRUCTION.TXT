@@ -1,6 +1,6 @@
 Para mag run boi 
 1. python -m pip install -r requirements.txt
-2. uvicorn app.main:app --reload  (Eto yung pag rurun mo sya)
+2. uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload  (Eto yung pag rurun mo sya)
 
 Note: Try mo lang muna display sa frontend mo yung camera boi yung live stream naka ready na lahat yan yung ibang services ako na bahala display mo lang muna sya.
 
