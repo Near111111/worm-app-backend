@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket
-from services.camera_live_stream import LiveStreamService
+from app.services.camera_live_stream import LiveStreamService
 
 router = APIRouter()
 

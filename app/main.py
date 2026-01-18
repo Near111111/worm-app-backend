@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from routes.camera_ws import router as camera_router
+from app.routes.camera_ws import router as camera_router
+
 
 app = FastAPI()
 
