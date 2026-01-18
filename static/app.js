@@ -16,24 +16,28 @@ async function initializeConnection() {
   try {
     statusElement.textContent = "🔍 Fetching server info...";
 
-    // Fetch server info from API
-    const response = await fetch(
-      `http://${location.hostname}:8000/api/server-info`,
+    // Fetch camera info
+    const cameraResponse = await fetch(
+      `http://${location.hostname}:8000/api/camera-info`,
     );
+    if (!cameraResponse.ok) throw new Error("Failed to fetch camera info");
+    const cameraInfo = await cameraResponse.json();
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch server info");
-    }
+    // Fetch notification info
+    const notifResponse = await fetch(
+      `http://${location.hostname}:8000/api/notification-info`,
+    );
+    if (!notifResponse.ok) throw new Error("Failed to fetch notification info");
+    const notifInfo = await notifResponse.json();
 
-    const serverInfo = await response.json();
+    console.log("📹 Camera Info:", cameraInfo);
+    console.log("🔔 Notification Info:", notifInfo);
 
-    console.log("📡 Server Info:", serverInfo);
+    // Use the WebSocket URLs from API
+    WS_URL_CAMERA = cameraInfo.websocket_url;
+    WS_URL_NOTIF = notifInfo.websocket_url;
 
-    // Use the IP and WebSocket URLs from server
-    WS_URL_CAMERA = serverInfo.websockets.camera;
-    WS_URL_NOTIF = serverInfo.websockets.notify;
-
-    statusElement.textContent = `✅ Connected to ${serverInfo.ip}:${serverInfo.port}`;
+    statusElement.textContent = `✅ Connected to ${cameraInfo.ip}:${cameraInfo.port}`;
 
     // Auto-connect to notifications
     connectNotifications();

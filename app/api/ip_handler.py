@@ -7,14 +7,24 @@ router = APIRouter()
 class ServerInfo(BaseModel):
     ip: str
     port: int
-    websockets: dict
+    status: str
+
+class CameraInfo(BaseModel):
+    ip: str
+    port: int
+    websocket_url: str
+    status: str
+
+class NotificationInfo(BaseModel):
+    ip: str
+    port: int
+    websocket_url: str
     status: str
 
 def get_local_ip() -> str:
     """Get the local IP address of the server"""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Connect to external address (doesn't actually send data)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     except Exception:
@@ -26,18 +36,41 @@ def get_local_ip() -> str:
 @router.get("/api/server-info", response_model=ServerInfo)
 async def get_server_info():
     """
-    Returns current server IP and WebSocket endpoints
-    React Native app can call this to discover the server
+    Returns basic server information
     """
     local_ip = get_local_ip()
     
     return ServerInfo(
         ip=local_ip,
         port=8000,
-        websockets={
-            "camera": f"ws://{local_ip}:8000/ws/camera",
-            "notify": f"ws://{local_ip}:8000/ws/notify"
-        },
+        status="online"
+    )
+
+@router.get("/api/camera-info", response_model=CameraInfo)
+async def get_camera_info():
+    """
+    Returns camera WebSocket endpoint information
+    """
+    local_ip = get_local_ip()
+    
+    return CameraInfo(
+        ip=local_ip,
+        port=8000,
+        websocket_url=f"ws://{local_ip}:8000/ws/camera",
+        status="online"
+    )
+
+@router.get("/api/notification-info", response_model=NotificationInfo)
+async def get_notification_info():
+    """
+    Returns notification WebSocket endpoint information
+    """
+    local_ip = get_local_ip()
+    
+    return NotificationInfo(
+        ip=local_ip,
+        port=8000,
+        websocket_url=f"ws://{local_ip}:8000/ws/notify",
         status="online"
     )
 
