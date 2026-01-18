@@ -18,3 +18,17 @@ const base64Frame = event.data;
   source={{ uri: imageUri }}
   style={{ width: 320, height: 240 }}
 />
+
+Example use to front end (Notification)
+
+1. const WS_URL_NOTIF = 'ws://BACKEND_IP:8000/ws/notify'; // Replace with your actual backend IP
+2. const ws = new WebSocket(WS_URL_NOTIF);
+3.ws.onopen = () => {
+      console.log('WebSocket connected for notifications');
+    };  //Pang check if connected or not
+
+4.ws.onmessage = (event) => {
+      // Update notification with the received message
+      const notifMessage = event.data;  // Assuming event.data is a plain text message
+      setNotification(notifMessage);
+    };
