@@ -24,33 +24,13 @@ class NotificationService:
     async def start_heartbeat(websocket):
         try:
             print("🔔 Starting notification heartbeat...")
-            
-            # Send "Heartbeat" for 3 seconds
-            for i in range(3):
-                await NotificationService.send_notification(
-                    websocket, 
-                    "Heartbeat", 
-                    f"Heartbeat #{i+1}"
-                )
-                await asyncio.sleep(1)
-
-            # After 3 seconds, send "Hello"
-            await NotificationService.send_notification(
-                websocket, 
-                "Hello", 
-                "Hello, world! 👋"
-            )
-            
-            # Keep sending periodic notifications
-            counter = 1
             while True:
-                await asyncio.sleep(3)
-                await NotificationService.send_notification(
-                    websocket, 
-                    "Test Notification", 
-                    f"Test message #{counter} 📨"
-                )
-                counter += 1
-
+                    await asyncio.sleep(30)
+                    await NotificationService.send_notification(
+                        websocket,
+                        "Heartbeat",
+                        "Connection is alive"
+                    )
+            
         except Exception as e:
             print(f"🛑 Notification service stopped: {e}")
