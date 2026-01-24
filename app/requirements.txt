@@ -3,3 +3,4 @@ uvicorn==0.40.0
 opencv-python==4.12.0.88
 websockets==16.0
 python-multipart
+zeroconf

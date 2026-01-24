@@ -1,34 +1,54 @@
-Para mag run boi 
-1. python -m pip install -r requirements.txt
-2. uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload  (Eto yung pag rurun mo sya)
+Prerequisites
 
-Note: Try mo lang muna display sa frontend mo yung camera boi yung live stream naka ready na lahat yan yung ibang services ako na bahala display mo lang muna sya.
+Python 3.8 or higher
+Webcam/Camera connected to your computer
+Both backend and frontend devices on the same WiFi network
 
-Example use to front end 
 
-1. const ws = new WebSocket("ws://BACKEND_IP:8000/ws/camera");
+Installation
+1. Install Dependencies
+bashpython -m pip install -r requirements.txt
+2. Run the Server
+bashuvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+3. Expected Output
+==================================================
+🚀 Server starting on 192.168.1.2:8000
+==================================================
+✅ mDNS service registered
+📡 Broadcasting as 'CameraStreamServer'
+🌐 Accessible at: http://192.168.1.2:8000
+📹 Camera WS: ws://192.168.1.2:8000/ws/camera
+🔔 Notify WS: ws://192.168.1.2:8000/ws/notify
 
-2. ws.onmessage = (event) => {
-const base64Frame = event.data;
 
-  setImageUri(`data:image/jpeg;base64,${base64Frame}`);
-};
+Camera not showing
 
-3.<Image
-  source={{ uri: imageUri }}
-  style={{ width: 320, height: 240 }}
-/>
+Check if webcam is connected
+Verify BACKEND_IP is correct
+Check terminal for errors
 
-Example use to front end (Notification)
+Notifications not appearing
 
-1. const WS_URL_NOTIF = 'ws://BACKEND_IP:8000/ws/notify'; // Replace with your actual backend IP
-2. const ws = new WebSocket(WS_URL_NOTIF);
-3.ws.onopen = () => {
-      console.log('WebSocket connected for notifications');
-    };  //Pang check if connected or not
+WebSocket must be connected
+Check browser/app console for errors
+Verify /ws/notify endpoint is accessible
 
-4.ws.onmessage = (event) => {
-      // Update notification with the received message
-      const notifMessage = event.data;  // Assuming event.data is a plain text message
-      setNotification(notifMessage);
-    };
+"Connection refused"
+
+Ensure server is running
+Both devices must be on same WiFi
+Check firewall isn't blocking port 8000
+
+Wrong IP Address
+
+Stop server (CTRL+C)
+Restart: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+Copy new IP from terminal
+
+
+Notes
+
+Dynamic IP Detection: Server automatically detects its IP on startup
+Auto-Discovery: Frontend can use /api/server-info to get WebSocket URLs
+Notifications: Server sends 3 heartbeat messages, then "Hello", then periodic test messages
+Camera Stream: Approximately 30 FPS at 640x480 resolution with 60% JPEG quality
