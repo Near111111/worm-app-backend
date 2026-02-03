@@ -1,0 +1,1 @@
+https://colab.research.google.com/github/ultralytics/ultralytics/blob/main/examples/tutorial.ipynb

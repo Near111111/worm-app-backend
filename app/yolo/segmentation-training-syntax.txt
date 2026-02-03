@@ -1,0 +1,4 @@
+!yolo task=segment mode=train model=yolo11n-seg.pt data=/content/Worm-5/data.yaml epochs=150 imgsz=640
+
+
+!yolo task=segment mode=train model=yolo11n-seg.pt data=/content/Worm-5/data.yaml epochs=150 imgsz=640
