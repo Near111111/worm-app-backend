@@ -9,6 +9,8 @@ import socket
 from app.routes.camera_ws import router as camera_router
 from app.routes.notify_ws import router as notify_router
 from app.api.ip_handler import router as api_router
+from app.routes.delete_images_route import router as delete_images_router
+from app.routes.delete_notifications import router as delete_notifications_router
 
 app = FastAPI()
 
@@ -29,6 +31,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(api_router)  # API routes
 app.include_router(camera_router)  # WebSocket for camera
 app.include_router(notify_router)  # WebSocket for notifications
+app.include_router(delete_images_router)  # Delete images routes
+app.include_router(delete_notifications_router)  # Delete notifications routes
 
 # Get local IP function
 def get_local_ip():
@@ -88,7 +92,9 @@ async def startup_event():
         print(f"📡 Broadcasting as 'CameraStreamServer'")
         print(f"🌐 Accessible at: http://{local_ip}:8000")
         print(f"📹 Camera WS: ws://{local_ip}:8000/ws/camera")
-        print(f"🔔 Notify WS: ws://{local_ip}:8000/ws/notify\n")
+        print(f"🔔 Notify WS: ws://{local_ip}:8000/ws/notify")
+        print(f"🗑️  Delete Images: http://{local_ip}:8000/api/images/delete-all")
+        print(f"🗑️  Delete Notifications: http://{local_ip}:8000/api/notifications/delete-all\n")
         
     except Exception as e:
         print(f"⚠️  mDNS registration failed: {e}")

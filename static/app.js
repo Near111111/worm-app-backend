@@ -5,8 +5,11 @@ let notificationTimeout = null;
 const img = document.getElementById("video");
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
+const deleteAllBtn = document.getElementById("deleteAllBtn");
+const deleteAllNotifBtn = document.getElementById("deleteAllNotifBtn");
 const notifElement = document.getElementById("notification");
 const statusElement = document.getElementById("status");
+const deleteStatusElement = document.getElementById("deleteStatus");
 
 let WS_URL_CAMERA = null;
 let WS_URL_NOTIF = null;
@@ -156,6 +159,118 @@ function displayNotification(notification) {
     notifElement.innerHTML = "";
   }, 3000);
 }
+
+// Handle Delete All Images
+deleteAllBtn.onclick = async () => {
+  // Confirm before deleting
+  if (
+    !confirm(
+      "⚠️ Are you sure you want to delete ALL saved images?\n\nThis action cannot be undone!",
+    )
+  ) {
+    return;
+  }
+
+  try {
+    deleteAllBtn.disabled = true;
+    deleteAllBtn.textContent = "🗑️ Deleting...";
+
+    deleteStatusElement.style.display = "block";
+    deleteStatusElement.className = "";
+    deleteStatusElement.textContent = "⏳ Deleting all images...";
+
+    const response = await fetch(
+      `http://${location.hostname}:8000/api/images/delete-all`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("🗑️ Delete result:", result);
+
+    deleteStatusElement.className = "success";
+    deleteStatusElement.textContent = `✅ Successfully deleted ${result.total_images} images from storage and database!`;
+
+    // Auto-hide status after 5 seconds
+    setTimeout(() => {
+      deleteStatusElement.style.display = "none";
+    }, 5000);
+  } catch (error) {
+    console.error("❌ Failed to delete images:", error);
+
+    deleteStatusElement.className = "error";
+    deleteStatusElement.textContent = `❌ Failed to delete images: ${error.message}`;
+
+    // Auto-hide status after 5 seconds
+    setTimeout(() => {
+      deleteStatusElement.style.display = "none";
+    }, 5000);
+  } finally {
+    deleteAllBtn.disabled = false;
+    deleteAllBtn.textContent = "🗑️ Delete All Images";
+  }
+};
+
+// Handle Delete All Notifications
+deleteAllNotifBtn.onclick = async () => {
+  // Confirm before deleting
+  if (
+    !confirm(
+      "⚠️ Are you sure you want to delete ALL notifications?\n\nThis action cannot be undone!",
+    )
+  ) {
+    return;
+  }
+
+  try {
+    deleteAllNotifBtn.disabled = true;
+    deleteAllNotifBtn.textContent = "🔔 Deleting...";
+
+    deleteStatusElement.style.display = "block";
+    deleteStatusElement.className = "";
+    deleteStatusElement.textContent = "⏳ Deleting all notifications...";
+
+    const response = await fetch(
+      `http://${location.hostname}:8000/api/notifications/delete-all`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("🔔 Delete result:", result);
+
+    deleteStatusElement.className = "success";
+    deleteStatusElement.textContent = `✅ Successfully deleted ${result.deleted_count} notifications from database!`;
+
+    // Auto-hide status after 5 seconds
+    setTimeout(() => {
+      deleteStatusElement.style.display = "none";
+    }, 5000);
+  } catch (error) {
+    console.error("❌ Failed to delete notifications:", error);
+
+    deleteStatusElement.className = "error";
+    deleteStatusElement.textContent = `❌ Failed to delete notifications: ${error.message}`;
+
+    // Auto-hide status after 5 seconds
+    setTimeout(() => {
+      deleteStatusElement.style.display = "none";
+    }, 5000);
+  } finally {
+    deleteAllNotifBtn.disabled = false;
+    deleteAllNotifBtn.textContent = "🔔 Delete All Notifications";
+  }
+};
 
 // Add CSS animation
 const style = document.createElement("style");
