@@ -10,7 +10,7 @@ async def notify_ws(websocket: WebSocket):
     print(f"✅ Notification client connected from {client_host}")
 
     try:
-        await NotificationService.start_heartbeat(websocket)
+        await NotificationService.start_monitoring(websocket)  # ← CHANGED HERE
     except WebSocketDisconnect:
         print(f"🔴 Notification client disconnected: {client_host}")
     except Exception as e:
