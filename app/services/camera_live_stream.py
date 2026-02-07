@@ -16,9 +16,9 @@ class LiveStreamService:
     model = YOLO(str(MODEL_PATH))
     
     # Constants
-    ROI_AREA_CM2 = 413
+    ROI_AREA_CM2 = 429
     ROI_AREA_M2 = ROI_AREA_CM2 / 10000
-    AVG_WORM_AREA = 386
+    AVG_WORM_AREA = 493
     
     @staticmethod
     def capture_frame(cap):
@@ -98,11 +98,7 @@ class LiveStreamService:
             print(f"❌ Cannot open video file: {LiveStreamService.VIDEO_PATH}")
             return
         
-        # Get video FPS to match original speed
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_delay = 1.0 / fps if fps > 0 else 0.033  # Default to 30fps if fps is 0
-        
-        print(f"🎬 Playing video: {LiveStreamService.VIDEO_PATH.name} at {fps} FPS")
+        print(f"🎬 Playing video: {LiveStreamService.VIDEO_PATH.name} at 30 FPS")
         
         loop = asyncio.get_event_loop()
 
@@ -118,7 +114,7 @@ class LiveStreamService:
                     break
 
                 await websocket.send_text(frame_data)
-                await asyncio.sleep(frame_delay)  # Match video FPS
+                await asyncio.sleep(0.033)  # Fixed 30 FPS (1/30 = 0.033)
 
         except Exception as e:
             print("Stream stopped:", e)
