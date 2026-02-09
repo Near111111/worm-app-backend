@@ -1,6 +1,7 @@
 import cv2
 import asyncio
 import base64
+import json
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from ultralytics import YOLO
@@ -9,36 +10,45 @@ from pathlib import Path
 class LiveStreamService:
     executor = ThreadPoolExecutor(max_workers=1)
     
+    # Shared state for stats
+    current_stats = {
+        "larvae_count": 0,
+        "density_cm2": 0,
+        "density_m2": 0,
+        "is_high_density": False,
+        "timestamp": ""
+    }
+    stats_lock = asyncio.Lock()
+    
     # Load YOLO model once
-    BASE_DIR = Path(__file__).resolve().parents[2]  # Go up 2 levels from services
+    BASE_DIR = Path(__file__).resolve().parents[2]
     MODEL_PATH = BASE_DIR / "app" / "yolo" / "models" / "trained" / "segmentv3.pt"
-    VIDEO_PATH = BASE_DIR / "app" / "yolo" / "videos" / "worm-vid.MOV"  # Video file
+    VIDEO_PATH = BASE_DIR / "app" / "yolo" / "videos" / "worm-vid.MOV"
     model = YOLO(str(MODEL_PATH))
     
     # Constants
-    ROI_AREA_CM2 = 429
+    ROI_AREA_CM2 = 413
     ROI_AREA_M2 = ROI_AREA_CM2 / 10000
-    AVG_WORM_AREA = 493
+    AVG_WORM_AREA = 386
+    DENSITY_THRESHOLD = 1.25
     
     @staticmethod
     def capture_frame(cap):
-        """Run in separate thread with YOLO detection"""
+        """Run YOLO once, return clean video frame + update stats"""
         ret, frame = cap.read()
         
-        # If video ended, loop back to start
         if not ret:
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
             if not ret:
                 return None
         
-        # Run YOLO inference
+        # Run YOLO inference ONCE
         results = LiveStreamService.model(frame, imgsz=640, conf=0.4, verbose=False)[0]
         
-        # Count worms and calculate metrics
+        # Calculate stats
         mask_count = 0
         total_mask_area = 0
-        alert_status = "Healthy Density"
         
         if results.masks is not None:
             masks = results.masks.data.cpu().numpy()
@@ -51,34 +61,32 @@ class LiveStreamService:
             
             area_est_count = total_mask_area / LiveStreamService.AVG_WORM_AREA if LiveStreamService.AVG_WORM_AREA > 0 else 0
             final_count = int(max(mask_count, area_est_count))
-            
             larvae_per_cm2 = final_count / LiveStreamService.ROI_AREA_CM2
             larvae_per_m2 = final_count / LiveStreamService.ROI_AREA_M2
-            
-            if larvae_per_cm2 > 1.25:
-                alert_status = f"⚠️ HIGH DENSITY: {larvae_per_cm2:.2f}/cm²"
+            is_high = larvae_per_cm2 > LiveStreamService.DENSITY_THRESHOLD
         else:
             final_count = 0
             larvae_per_cm2 = 0
             larvae_per_m2 = 0
+            is_high = False
         
-        # Get annotated frame with bounding boxes
-        annotated_frame = results.plot()
+        # Update shared stats (thread-safe)
+        from datetime import datetime
+        LiveStreamService.current_stats = {
+            "larvae_count": final_count,
+            "density_cm2": round(larvae_per_cm2, 2),
+            "density_m2": round(larvae_per_m2, 1),
+            "is_high_density": is_high,
+            "timestamp": datetime.now().isoformat()
+        }
         
-        # Add text overlays
-        cv2.putText(annotated_frame, f"Larvae Count: {final_count}", (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        cv2.putText(annotated_frame, f"Density: {larvae_per_cm2:.2f}/cm2", (20, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        cv2.putText(annotated_frame, f"Per m2: {larvae_per_m2:.1f}", (20, 120),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        # Alert status
-        color = (0, 0, 255) if "HIGH" in alert_status else (0, 255, 0)
-        cv2.putText(annotated_frame, alert_status, (20, 160),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        # Get CLEAN annotated frame (bounding boxes only, NO labels/confidence)
+        annotated_frame = results.plot(
+            conf=False,        # ← Hide confidence scores
+            labels=False,      # ← Hide class labels
+            boxes=True,        # ✓ Show bounding boxes only
+            line_width=2
+        )
         
         # Resize and encode
         frame = cv2.resize(annotated_frame, (640, 480))
@@ -90,16 +98,15 @@ class LiveStreamService:
         return base64.b64encode(buffer).decode("utf-8")
     
     @staticmethod
-    async def start(websocket):
-        # Open video file instead of camera
-        cap = cv2.VideoCapture(0)
+    async def start_video_stream(websocket):
+        """Send clean video frames"""
+        cap = cv2.VideoCapture(str(LiveStreamService.VIDEO_PATH))
         
         if not cap.isOpened():
-            print(f"❌ Cannot open video file: {LiveStreamService.VIDEO_PATH}")
+            print(f"❌ Cannot open video file")
             return
         
-        print(f"🎬 Playing video: {LiveStreamService.VIDEO_PATH.name} at 30 FPS")
-        
+        print(f"🎬 Playing video at 30 FPS (clean UI)")
         loop = asyncio.get_event_loop()
 
         try:
@@ -114,9 +121,22 @@ class LiveStreamService:
                     break
 
                 await websocket.send_text(frame_data)
-                await asyncio.sleep(0.033)  # Fixed 30 FPS (1/30 = 0.033)
+                await asyncio.sleep(0.033)  # 30 FPS
 
         except Exception as e:
-            print("Stream stopped:", e)
+            print("Video stream stopped:", e)
         finally: 
             cap.release()
+    
+    @staticmethod
+    async def start_stats_stream(websocket):
+        """Send stats updates (lighter, ~10 updates per second)"""
+        try:
+            while True:
+                # Send current stats as JSON
+                stats_json = json.dumps(LiveStreamService.current_stats)
+                await websocket.send_text(stats_json)
+                await asyncio.sleep(0.1)  # 10 updates/sec (lighter than video)
+                
+        except Exception as e:
+            print("Stats stream stopped:", e)
