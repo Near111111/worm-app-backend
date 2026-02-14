@@ -22,7 +22,7 @@ class LiveStreamService:
     
     # Load YOLO model once
     BASE_DIR = Path(__file__).resolve().parents[2]
-    MODEL_PATH = BASE_DIR / "app" / "yolo" / "models" / "trained" / "segmentv3.pt"
+    MODEL_PATH = BASE_DIR / "app" / "yolo" / "models" / "trained" / "wormv11-seg-final.pt"
     VIDEO_PATH = BASE_DIR / "app" / "yolo" / "videos" / "worm-vid.MOV"
     model = YOLO(str(MODEL_PATH))
     
@@ -100,7 +100,7 @@ class LiveStreamService:
     @staticmethod
     async def start_video_stream(websocket):
         """Send clean video frames"""
-        cap = cv2.VideoCapture(str(LiveStreamService.VIDEO_PATH))
+        cap = cv2.VideoCapture(0)
         
         if not cap.isOpened():
             print(f"❌ Cannot open video file")

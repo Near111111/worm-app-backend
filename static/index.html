@@ -5,7 +5,7 @@
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        max-width: 800px;
+        max-width: 900px;
         margin: 0 auto;
         padding: 20px;
         background-color: #1a1a2e;
@@ -82,13 +82,96 @@
         cursor: not-allowed;
       }
 
+      .video-container {
+        position: relative;
+        max-width: 640px;
+        margin: 0 auto;
+      }
+
       #video {
         display: block;
         width: 100%;
-        max-width: 640px;
-        margin: 0 auto;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Stats Panel Below Camera */
+      .stats-panel {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+
+      .stat-item {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #fff;
+      }
+
+      .stat-value.highlight {
+        color: #ff6b6b;
+        animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .alert-badge {
+        grid-column: 1 / -1;
+        background: rgba(255, 107, 107, 0.2);
+        border: 2px solid #ff6b6b;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 16px;
+        color: #ff6b6b;
+        display: none;
+      }
+
+      .alert-badge.active {
+        display: block;
+        animation: alertBlink 1s infinite;
+      }
+
+      @keyframes alertBlink {
+        0%,
+        100% {
+          background: rgba(255, 107, 107, 0.2);
+        }
+        50% {
+          background: rgba(255, 107, 107, 0.4);
+        }
       }
 
       #notification {
@@ -119,6 +202,17 @@
         background-color: rgba(231, 76, 60, 0.2);
         color: #e74c3c;
       }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(-20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
@@ -138,8 +232,38 @@
     <!-- Delete Status -->
     <div id="deleteStatus"></div>
 
-    <!-- Camera Feed -->
-    <img id="video" alt="Camera feed will appear here" />
+    <!-- Video Container -->
+    <div class="video-container">
+      <!-- Camera Feed -->
+      <img id="video" alt="Camera feed will appear here" />
+
+      <!-- Stats Panel Below Camera -->
+      <div class="stats-panel">
+        <div class="alert-badge" id="alertBadge">⚠️ HIGH DENSITY DETECTED!</div>
+
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-label">Larvae Count</div>
+            <div class="stat-value" id="larvaeCount">0</div>
+          </div>
+
+          <div class="stat-item">
+            <div class="stat-label">Density (cm²)</div>
+            <div class="stat-value" id="densityCm2">0.00</div>
+          </div>
+
+          <div class="stat-item">
+            <div class="stat-label">Density (m²)</div>
+            <div class="stat-value" id="densityM2">0.0</div>
+          </div>
+
+          <div class="stat-item">
+            <div class="stat-label">Status</div>
+            <div class="stat-value" id="statusIndicator">●</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Notification Area -->
     <div id="notification"></div>

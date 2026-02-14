@@ -1,4 +1,5 @@
 let socket = null;
+let statsSocket = null; // NEW: Stats WebSocket
 let notifSocket = null;
 let notificationTimeout = null;
 
@@ -11,7 +12,15 @@ const notifElement = document.getElementById("notification");
 const statusElement = document.getElementById("status");
 const deleteStatusElement = document.getElementById("deleteStatus");
 
+// Stats elements
+const larvaeCountEl = document.getElementById("larvaeCount");
+const densityCm2El = document.getElementById("densityCm2");
+const densityM2El = document.getElementById("densityM2");
+const statusIndicatorEl = document.getElementById("statusIndicator");
+const alertBadgeEl = document.getElementById("alertBadge");
+
 let WS_URL_CAMERA = null;
+let WS_URL_STATS = null; // NEW: Stats WebSocket URL
 let WS_URL_NOTIF = null;
 
 // Fetch server info on page load
@@ -38,6 +47,7 @@ async function initializeConnection() {
 
     // Use the WebSocket URLs from API
     WS_URL_CAMERA = cameraInfo.websocket_url;
+    WS_URL_STATS = `ws://${cameraInfo.ip}:${cameraInfo.port}/ws/camera-stats`; // NEW
     WS_URL_NOTIF = notifInfo.websocket_url;
 
     statusElement.textContent = `✅ Connected to ${cameraInfo.ip}:${cameraInfo.port}`;
@@ -65,6 +75,9 @@ startBtn.onclick = () => {
     console.log("✅ Camera WebSocket connected");
     startBtn.disabled = true;
     stopBtn.disabled = false;
+
+    // Also connect to stats WebSocket
+    connectStats();
   };
 
   socket.onmessage = (event) => {
@@ -81,6 +94,11 @@ startBtn.onclick = () => {
     img.src = "";
     startBtn.disabled = false;
     stopBtn.disabled = true;
+
+    // Close stats socket too
+    if (statsSocket) {
+      statsSocket.close();
+    }
   };
 };
 
@@ -88,7 +106,71 @@ stopBtn.onclick = () => {
   if (socket) {
     socket.close();
   }
+  if (statsSocket) {
+    statsSocket.close();
+  }
 };
+
+// NEW: Handle Stats WebSocket
+function connectStats() {
+  if (statsSocket || !WS_URL_STATS) return;
+
+  console.log("📊 Connecting to stats:", WS_URL_STATS);
+  statsSocket = new WebSocket(WS_URL_STATS);
+
+  statsSocket.onopen = () => {
+    console.log("✅ Stats WebSocket connected");
+  };
+
+  statsSocket.onmessage = (event) => {
+    try {
+      const stats = JSON.parse(event.data);
+      updateStatsDisplay(stats);
+    } catch (error) {
+      console.error("❌ Error parsing stats:", error);
+    }
+  };
+
+  statsSocket.onerror = (error) => {
+    console.error("❌ Stats WebSocket error:", error);
+  };
+
+  statsSocket.onclose = () => {
+    console.log("🔴 Stats WebSocket closed");
+    statsSocket = null;
+  };
+}
+
+// NEW: Update stats display
+function updateStatsDisplay(stats) {
+  // Update values
+  larvaeCountEl.textContent = stats.larvae_count;
+  densityCm2El.textContent = stats.density_cm2.toFixed(2);
+  densityM2El.textContent = stats.density_m2.toFixed(1);
+
+  // Update status indicator
+  if (stats.is_high_density) {
+    statusIndicatorEl.textContent = "●";
+    statusIndicatorEl.style.color = "#ff6b6b";
+    statusIndicatorEl.classList.add("highlight");
+
+    // Show alert badge
+    alertBadgeEl.classList.add("active");
+
+    // Highlight density values
+    densityCm2El.classList.add("highlight");
+  } else {
+    statusIndicatorEl.textContent = "●";
+    statusIndicatorEl.style.color = "#2ecc71";
+    statusIndicatorEl.classList.remove("highlight");
+
+    // Hide alert badge
+    alertBadgeEl.classList.remove("active");
+
+    // Remove highlight
+    densityCm2El.classList.remove("highlight");
+  }
+}
 
 // Handle Notification WebSocket
 function connectNotifications() {
@@ -162,7 +244,6 @@ function displayNotification(notification) {
 
 // Handle Delete All Images
 deleteAllBtn.onclick = async () => {
-  // Confirm before deleting
   if (
     !confirm(
       "⚠️ Are you sure you want to delete ALL saved images?\n\nThis action cannot be undone!",
@@ -196,7 +277,6 @@ deleteAllBtn.onclick = async () => {
     deleteStatusElement.className = "success";
     deleteStatusElement.textContent = `✅ Successfully deleted ${result.total_images} images from storage and database!`;
 
-    // Auto-hide status after 5 seconds
     setTimeout(() => {
       deleteStatusElement.style.display = "none";
     }, 5000);
@@ -206,7 +286,6 @@ deleteAllBtn.onclick = async () => {
     deleteStatusElement.className = "error";
     deleteStatusElement.textContent = `❌ Failed to delete images: ${error.message}`;
 
-    // Auto-hide status after 5 seconds
     setTimeout(() => {
       deleteStatusElement.style.display = "none";
     }, 5000);
@@ -218,7 +297,6 @@ deleteAllBtn.onclick = async () => {
 
 // Handle Delete All Notifications
 deleteAllNotifBtn.onclick = async () => {
-  // Confirm before deleting
   if (
     !confirm(
       "⚠️ Are you sure you want to delete ALL notifications?\n\nThis action cannot be undone!",
@@ -252,7 +330,6 @@ deleteAllNotifBtn.onclick = async () => {
     deleteStatusElement.className = "success";
     deleteStatusElement.textContent = `✅ Successfully deleted ${result.deleted_count} notifications from database!`;
 
-    // Auto-hide status after 5 seconds
     setTimeout(() => {
       deleteStatusElement.style.display = "none";
     }, 5000);
@@ -262,7 +339,6 @@ deleteAllNotifBtn.onclick = async () => {
     deleteStatusElement.className = "error";
     deleteStatusElement.textContent = `❌ Failed to delete notifications: ${error.message}`;
 
-    // Auto-hide status after 5 seconds
     setTimeout(() => {
       deleteStatusElement.style.display = "none";
     }, 5000);
@@ -272,25 +348,9 @@ deleteAllNotifBtn.onclick = async () => {
   }
 };
 
-// Add CSS animation
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes slideIn {
-    from {
-      transform: translateY(-20px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-`;
-document.head.appendChild(style);
-
 // Initialize connection when page loads
 window.addEventListener("load", () => {
   console.log("🚀 Page loaded, initializing connection...");
-  startBtn.disabled = true; // Disable until server info is fetched
+  startBtn.disabled = true;
   initializeConnection();
 });
