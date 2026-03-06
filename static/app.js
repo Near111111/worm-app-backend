@@ -1,8 +1,22 @@
-let socket = null;
-let statsSocket = null; // NEW: Stats WebSocket
-let notifSocket = null;
-let notificationTimeout = null;
+// ─────────────────────────────────────────────
+//  WebSocket instances
+// ─────────────────────────────────────────────
+let socket = null; // camera
+let statsSocket = null; // camera-stats
+let notifSocket = null; // notifications
+let sensorSocket = null; // DHT22 sensors
 
+// ─────────────────────────────────────────────
+//  WebSocket URLs
+// ─────────────────────────────────────────────
+let WS_URL_CAMERA = null;
+let WS_URL_STATS = null;
+let WS_URL_NOTIF = null;
+let WS_URL_SENSORS = null;
+
+// ─────────────────────────────────────────────
+//  DOM references
+// ─────────────────────────────────────────────
 const img = document.getElementById("video");
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
@@ -12,50 +26,47 @@ const notifElement = document.getElementById("notification");
 const statusElement = document.getElementById("status");
 const deleteStatusElement = document.getElementById("deleteStatus");
 
-// Stats elements
+// Stats panel
 const larvaeCountEl = document.getElementById("larvaeCount");
 const densityCm2El = document.getElementById("densityCm2");
 const densityM2El = document.getElementById("densityM2");
 const statusIndicatorEl = document.getElementById("statusIndicator");
 const alertBadgeEl = document.getElementById("alertBadge");
 
-let WS_URL_CAMERA = null;
-let WS_URL_STATS = null; // NEW: Stats WebSocket URL
-let WS_URL_NOTIF = null;
+// Sensor panel
+const tempValueEl = document.getElementById("tempValue");
+const humidValueEl = document.getElementById("humidValue");
+const sensorStatusEl = document.getElementById("sensorStatus");
 
-// Fetch server info on page load
+let notificationTimeout = null;
+
+// ─────────────────────────────────────────────
+//  Init — fetch server info then connect
+// ─────────────────────────────────────────────
 async function initializeConnection() {
   try {
     statusElement.textContent = "🔍 Fetching server info...";
 
-    // Fetch camera info
-    const cameraResponse = await fetch(
-      `http://${location.hostname}:8000/api/camera-info`,
-    );
-    if (!cameraResponse.ok) throw new Error("Failed to fetch camera info");
-    const cameraInfo = await cameraResponse.json();
+    const [cameraRes, notifRes] = await Promise.all([
+      fetch(`http://${location.hostname}:8000/api/camera-info`),
+      fetch(`http://${location.hostname}:8000/api/notification-info`),
+    ]);
 
-    // Fetch notification info
-    const notifResponse = await fetch(
-      `http://${location.hostname}:8000/api/notification-info`,
-    );
-    if (!notifResponse.ok) throw new Error("Failed to fetch notification info");
-    const notifInfo = await notifResponse.json();
+    if (!cameraRes.ok) throw new Error("Failed to fetch camera info");
+    if (!notifRes.ok) throw new Error("Failed to fetch notification info");
 
-    console.log("📹 Camera Info:", cameraInfo);
-    console.log("🔔 Notification Info:", notifInfo);
+    const cameraInfo = await cameraRes.json();
+    const notifInfo = await notifRes.json();
 
-    // Use the WebSocket URLs from API
     WS_URL_CAMERA = cameraInfo.websocket_url;
-    WS_URL_STATS = `ws://${cameraInfo.ip}:${cameraInfo.port}/ws/camera-stats`; // NEW
+    WS_URL_STATS = `ws://${cameraInfo.ip}:${cameraInfo.port}/ws/camera-stats`;
     WS_URL_NOTIF = notifInfo.websocket_url;
+    WS_URL_SENSORS = `ws://${cameraInfo.ip}:${cameraInfo.port}/ws/sensors`;
 
     statusElement.textContent = `✅ Connected to ${cameraInfo.ip}:${cameraInfo.port}`;
 
-    // Auto-connect to notifications
     connectNotifications();
-
-    // Enable start button
+    connectSensors();
     startBtn.disabled = false;
   } catch (error) {
     console.error("❌ Failed to fetch server info:", error);
@@ -64,293 +75,283 @@ async function initializeConnection() {
   }
 }
 
-// Handle Camera WebSocket
+// ─────────────────────────────────────────────
+//  Camera WebSocket
+// ─────────────────────────────────────────────
 startBtn.onclick = () => {
   if (socket || !WS_URL_CAMERA) return;
-
-  console.log("📹 Connecting to:", WS_URL_CAMERA);
   socket = new WebSocket(WS_URL_CAMERA);
 
   socket.onopen = () => {
-    console.log("✅ Camera WebSocket connected");
     startBtn.disabled = true;
     stopBtn.disabled = false;
-
-    // Also connect to stats WebSocket
     connectStats();
   };
-
   socket.onmessage = (event) => {
     img.src = "data:image/jpeg;base64," + event.data;
   };
-
-  socket.onerror = (error) => {
-    console.error("❌ Camera WebSocket error:", error);
-  };
-
+  socket.onerror = (e) => console.error("❌ Camera WS error:", e);
   socket.onclose = () => {
-    console.log("🔴 Camera WebSocket closed");
     socket = null;
     img.src = "";
     startBtn.disabled = false;
     stopBtn.disabled = true;
-
-    // Close stats socket too
-    if (statsSocket) {
-      statsSocket.close();
-    }
+    if (statsSocket) statsSocket.close();
   };
 };
 
 stopBtn.onclick = () => {
-  if (socket) {
-    socket.close();
-  }
-  if (statsSocket) {
-    statsSocket.close();
-  }
+  if (socket) socket.close();
+  if (statsSocket) statsSocket.close();
 };
 
-// NEW: Handle Stats WebSocket
+// ─────────────────────────────────────────────
+//  Stats WebSocket  (live YOLO updates)
+// ─────────────────────────────────────────────
 function connectStats() {
   if (statsSocket || !WS_URL_STATS) return;
-
-  console.log("📊 Connecting to stats:", WS_URL_STATS);
   statsSocket = new WebSocket(WS_URL_STATS);
 
-  statsSocket.onopen = () => {
-    console.log("✅ Stats WebSocket connected");
-  };
-
+  statsSocket.onopen = () => console.log("✅ Stats WS connected");
   statsSocket.onmessage = (event) => {
     try {
-      const stats = JSON.parse(event.data);
-      updateStatsDisplay(stats);
-    } catch (error) {
-      console.error("❌ Error parsing stats:", error);
+      updateStatsPanel(JSON.parse(event.data));
+    } catch (e) {
+      console.error("❌ Stats parse error:", e);
     }
   };
-
-  statsSocket.onerror = (error) => {
-    console.error("❌ Stats WebSocket error:", error);
-  };
-
+  statsSocket.onerror = (e) => console.error("❌ Stats WS error:", e);
   statsSocket.onclose = () => {
-    console.log("🔴 Stats WebSocket closed");
     statsSocket = null;
   };
 }
 
-// NEW: Update stats display
-function updateStatsDisplay(stats) {
-  // Update values
+function updateStatsPanel(stats) {
   larvaeCountEl.textContent = stats.larvae_count;
-  densityCm2El.textContent = stats.density_cm2.toFixed(2);
-  densityM2El.textContent = stats.density_m2.toFixed(1);
+  densityCm2El.textContent = parseFloat(stats.density_cm2).toFixed(2);
+  densityM2El.textContent = parseFloat(stats.density_m2).toFixed(1);
 
-  // Update status indicator
   if (stats.is_high_density) {
-    statusIndicatorEl.textContent = "●";
-    statusIndicatorEl.style.color = "#ff6b6b";
-    statusIndicatorEl.classList.add("highlight");
-
-    // Show alert badge
+    statusIndicatorEl.className = "stat-value danger";
     alertBadgeEl.classList.add("active");
-
-    // Highlight density values
-    densityCm2El.classList.add("highlight");
+    densityCm2El.classList.add("danger");
   } else {
-    statusIndicatorEl.textContent = "●";
-    statusIndicatorEl.style.color = "#2ecc71";
-    statusIndicatorEl.classList.remove("highlight");
-
-    // Hide alert badge
+    statusIndicatorEl.className = "stat-value good";
     alertBadgeEl.classList.remove("active");
-
-    // Remove highlight
-    densityCm2El.classList.remove("highlight");
+    densityCm2El.classList.remove("danger");
   }
 }
 
-// Handle Notification WebSocket
-function connectNotifications() {
-  if (notifSocket || !WS_URL_NOTIF) return;
+// ─────────────────────────────────────────────
+//  Sensor WebSocket  (live MQTT updates)
+// ─────────────────────────────────────────────
+function connectSensors() {
+  if (sensorSocket) return;
+  WS_URL_SENSORS =
+    WS_URL_SENSORS || `ws://${location.hostname}:8000/ws/sensors`;
+  sensorSocket = new WebSocket(WS_URL_SENSORS);
 
-  console.log("🔔 Connecting to:", WS_URL_NOTIF);
-  notifSocket = new WebSocket(WS_URL_NOTIF);
-
-  notifSocket.onopen = () => {
-    console.log("✅ Notification WebSocket connected");
+  sensorSocket.onopen = () => {
+    sensorStatusEl.innerHTML = `<span class="sensor-dot"></span>Connected — waiting for data...`;
   };
-
-  notifSocket.onmessage = (event) => {
-    console.log("📨 Notification received:", event.data);
+  sensorSocket.onmessage = (event) => {
     try {
-      const notification = JSON.parse(event.data);
-      displayNotification(notification);
-    } catch (error) {
-      console.error("❌ Error parsing notification:", error);
+      const data = JSON.parse(event.data);
+      // ignore ping keepalives
+      if (data.ping) return;
+      updateSensorPanel(data.temperature, data.humidity);
+    } catch {
+      sensorStatusEl.innerHTML = `<span class="sensor-dot"></span>Raw: ${event.data}`;
     }
   };
-
-  notifSocket.onerror = (error) => {
-    console.error("❌ Notification WebSocket error:", error);
+  sensorSocket.onerror = () => {
+    sensorStatusEl.textContent = "❌ Sensor connection error";
   };
-
-  notifSocket.onclose = () => {
-    console.log("🔴 Notification WebSocket closed");
-    notifSocket = null;
-
-    // Auto-reconnect after 3 seconds
-    setTimeout(() => {
-      console.log("🔄 Reconnecting to notifications...");
-      connectNotifications();
-    }, 3000);
+  sensorSocket.onclose = () => {
+    sensorSocket = null;
+    sensorStatusEl.innerHTML = `<span class="sensor-dot" style="background:var(--danger)"></span>Reconnecting...`;
+    setTimeout(connectSensors, 3000);
   };
 }
 
-// Function to display notifications
-function displayNotification(notification) {
-  // Clear previous timeout
-  if (notificationTimeout) {
-    clearTimeout(notificationTimeout);
+function updateSensorPanel(temperature, humidity) {
+  if (temperature && temperature !== "--") {
+    tempValueEl.textContent = parseFloat(temperature).toFixed(1);
+  }
+  if (humidity && humidity !== "--") {
+    humidValueEl.textContent = parseFloat(humidity).toFixed(1);
+  }
+  const now = new Date().toLocaleTimeString();
+  sensorStatusEl.innerHTML = `<span class="sensor-dot"></span>Last updated: ${now}`;
+}
+
+// ─────────────────────────────────────────────
+//  Notification WebSocket
+// ─────────────────────────────────────────────
+function connectNotifications() {
+  if (notifSocket || !WS_URL_NOTIF) return;
+  notifSocket = new WebSocket(WS_URL_NOTIF);
+
+  notifSocket.onopen = () => console.log("✅ Notification WS connected");
+  notifSocket.onmessage = (event) => {
+    try {
+      handleNotification(JSON.parse(event.data));
+    } catch (e) {
+      console.error("❌ Notification parse error:", e);
+    }
+  };
+  notifSocket.onerror = (e) => console.error("❌ Notif WS error:", e);
+  notifSocket.onclose = () => {
+    notifSocket = null;
+    setTimeout(connectNotifications, 3000);
+  };
+}
+
+function handleNotification(n) {
+  console.log("📨 Notification:", n);
+
+  // ignore ping keepalives
+  if (n.ping) return;
+
+  const isHourly = n.type === "hourly_report";
+  const isDensity = n.type === "density_alert";
+
+  // ── Update stats panel ─────────────────────────────────────────────────
+  if (n.larvae_count !== undefined) {
+    larvaeCountEl.textContent = n.larvae_count;
+  }
+  if (n.density_per_cm2 !== undefined) {
+    const d = parseFloat(n.density_per_cm2);
+    densityCm2El.textContent = d.toFixed(2);
+    densityM2El.textContent = (d * 10000).toFixed(1);
+
+    if (d > 1.25) {
+      statusIndicatorEl.className = "stat-value danger";
+      alertBadgeEl.classList.add("active");
+      densityCm2El.classList.add("danger");
+    } else {
+      statusIndicatorEl.className = "stat-value good";
+      alertBadgeEl.classList.remove("active");
+      densityCm2El.classList.remove("danger");
+    }
   }
 
-  // Display notification
-  notifElement.innerHTML = `
-    <div style="
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 15px 20px;
-      border-radius: 10px;
-      margin: 10px 0;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      animation: slideIn 0.3s ease-out;
-    ">
-      <strong style="font-size: 18px; display: block; margin-bottom: 5px;">
-        ${notification.title}
-      </strong>
-      <span style="font-size: 14px;">
-        ${notification.message}
-      </span>
-    </div>
-  `;
+  // ── Update sensor panel (hourly report only) ───────────────────────────
+  if (isHourly && n.temperature && n.temperature !== "--") {
+    updateSensorPanel(n.temperature, n.humidity);
+  }
 
-  // Auto-clear notification after 3 seconds
+  // ── Build toast ────────────────────────────────────────────────────────
+  if (notificationTimeout) clearTimeout(notificationTimeout);
+
+  let rows = "";
+
+  if (n.larvae_count !== undefined) {
+    rows += `
+      <div class="toast-row">
+        <span>🪱 Larvae</span>
+        <strong>${n.larvae_count}&nbsp;(${parseFloat(n.density_per_cm2).toFixed(2)}/cm²)</strong>
+      </div>`;
+  }
+
+  if (isHourly && n.temperature && n.temperature !== "--") {
+    rows += `
+      <div class="toast-row">
+        <span>🌡️ Temp</span>
+        <strong>${parseFloat(n.temperature).toFixed(1)}°C</strong>
+      </div>
+      <div class="toast-row">
+        <span>💧 Humidity</span>
+        <strong>${parseFloat(n.humidity).toFixed(1)}%</strong>
+      </div>`;
+  }
+
+  const bg = isDensity
+    ? "linear-gradient(135deg,#c0392b,#e74c3c)"
+    : "linear-gradient(135deg,#667eea,#764ba2)";
+  const duration = isDensity ? 8000 : 6000;
+
+  notifElement.innerHTML = `
+    <div class="toast" style="background:${bg}">
+      <div class="toast-title">${n.title}</div>
+      ${rows}
+    </div>`;
+
   notificationTimeout = setTimeout(() => {
     notifElement.innerHTML = "";
-  }, 3000);
+  }, duration);
 }
 
-// Handle Delete All Images
+// ─────────────────────────────────────────────
+//  Delete All Images
+// ─────────────────────────────────────────────
 deleteAllBtn.onclick = async () => {
-  if (
-    !confirm(
-      "⚠️ Are you sure you want to delete ALL saved images?\n\nThis action cannot be undone!",
-    )
-  ) {
-    return;
-  }
-
+  if (!confirm("⚠️ Delete ALL saved images? This cannot be undone!")) return;
   try {
     deleteAllBtn.disabled = true;
     deleteAllBtn.textContent = "🗑️ Deleting...";
+    showDeleteStatus("", "⏳ Deleting all images...");
 
-    deleteStatusElement.style.display = "block";
-    deleteStatusElement.className = "";
-    deleteStatusElement.textContent = "⏳ Deleting all images...";
-
-    const response = await fetch(
+    const res = await fetch(
       `http://${location.hostname}:8000/api/images/delete-all`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
     );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log("🗑️ Delete result:", result);
-
-    deleteStatusElement.className = "success";
-    deleteStatusElement.textContent = `✅ Successfully deleted ${result.total_images} images from storage and database!`;
-
-    setTimeout(() => {
-      deleteStatusElement.style.display = "none";
-    }, 5000);
-  } catch (error) {
-    console.error("❌ Failed to delete images:", error);
-
-    deleteStatusElement.className = "error";
-    deleteStatusElement.textContent = `❌ Failed to delete images: ${error.message}`;
-
-    setTimeout(() => {
-      deleteStatusElement.style.display = "none";
-    }, 5000);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await res.json();
+    showDeleteStatus("success", `✅ Deleted ${result.total_images} images!`);
+  } catch (e) {
+    showDeleteStatus("error", `❌ Failed: ${e.message}`);
   } finally {
     deleteAllBtn.disabled = false;
-    deleteAllBtn.textContent = "🗑️ Delete All Images";
+    deleteAllBtn.textContent = "🗑️ Delete Images";
   }
 };
 
-// Handle Delete All Notifications
+// ─────────────────────────────────────────────
+//  Delete All Notifications
+// ─────────────────────────────────────────────
 deleteAllNotifBtn.onclick = async () => {
-  if (
-    !confirm(
-      "⚠️ Are you sure you want to delete ALL notifications?\n\nThis action cannot be undone!",
-    )
-  ) {
-    return;
-  }
-
+  if (!confirm("⚠️ Delete ALL notifications? This cannot be undone!")) return;
   try {
     deleteAllNotifBtn.disabled = true;
     deleteAllNotifBtn.textContent = "🔔 Deleting...";
+    showDeleteStatus("", "⏳ Deleting all notifications...");
 
-    deleteStatusElement.style.display = "block";
-    deleteStatusElement.className = "";
-    deleteStatusElement.textContent = "⏳ Deleting all notifications...";
-
-    const response = await fetch(
+    const res = await fetch(
       `http://${location.hostname}:8000/api/notifications/delete-all`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
     );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log("🔔 Delete result:", result);
-
-    deleteStatusElement.className = "success";
-    deleteStatusElement.textContent = `✅ Successfully deleted ${result.deleted_count} notifications from database!`;
-
-    setTimeout(() => {
-      deleteStatusElement.style.display = "none";
-    }, 5000);
-  } catch (error) {
-    console.error("❌ Failed to delete notifications:", error);
-
-    deleteStatusElement.className = "error";
-    deleteStatusElement.textContent = `❌ Failed to delete notifications: ${error.message}`;
-
-    setTimeout(() => {
-      deleteStatusElement.style.display = "none";
-    }, 5000);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await res.json();
+    showDeleteStatus(
+      "success",
+      `✅ Deleted ${result.deleted_count} notifications!`,
+    );
+  } catch (e) {
+    showDeleteStatus("error", `❌ Failed: ${e.message}`);
   } finally {
     deleteAllNotifBtn.disabled = false;
-    deleteAllNotifBtn.textContent = "🔔 Delete All Notifications";
+    deleteAllNotifBtn.textContent = "🔔 Delete Notifications";
   }
 };
 
-// Initialize connection when page loads
+// ─────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────
+function showDeleteStatus(cls, msg) {
+  deleteStatusElement.style.display = "block";
+  deleteStatusElement.className = cls;
+  deleteStatusElement.textContent = msg;
+  if (cls)
+    setTimeout(() => {
+      deleteStatusElement.style.display = "none";
+    }, 5000);
+}
+
+// ─────────────────────────────────────────────
+//  Boot
+// ─────────────────────────────────────────────
 window.addEventListener("load", () => {
-  console.log("🚀 Page loaded, initializing connection...");
   startBtn.disabled = true;
   initializeConnection();
 });

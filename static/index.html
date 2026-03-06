@@ -1,139 +1,231 @@
 <!doctype html>
 <html>
   <head>
-    <title>Live Camera</title>
+    <title>WormCam Dashboard</title>
     <style>
+      @import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap");
+
+      :root {
+        --bg: #0d0f1a;
+        --panel: #13162a;
+        --border: rgba(100, 120, 255, 0.15);
+        --accent: #667eea;
+        --accent2: #11998e;
+        --danger: #ff6b6b;
+        --warn: #f39c12;
+        --text: #e0e4ff;
+        --muted: rgba(224, 228, 255, 0.45);
+        --mono: "Share Tech Mono", monospace;
+        --sans: "Exo 2", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
       body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #1a1a2e;
-        color: #fff;
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 24px 16px;
       }
 
-      h2 {
-        text-align: center;
-        color: #667eea;
+      /* ── Header ── */
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      header h1 {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      header .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--danger);
+        animation: blink 1.2s infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.2;
+        }
       }
 
+      /* ── Status bar ── */
       #status {
         text-align: center;
-        padding: 10px;
-        background-color: rgba(102, 126, 234, 0.2);
+        padding: 8px 16px;
+        background: rgba(102, 126, 234, 0.1);
+        border: 1px solid var(--border);
         border-radius: 8px;
         margin-bottom: 20px;
-        font-size: 14px;
+        font-size: 13px;
+        font-family: var(--mono);
+        color: var(--muted);
       }
 
+      /* ── Controls ── */
       .controls {
-        text-align: center;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
         margin-bottom: 20px;
       }
 
       button {
-        padding: 10px 20px;
-        font-size: 16px;
+        padding: 9px 18px;
+        font-size: 14px;
+        font-family: var(--sans);
+        font-weight: 600;
         border: none;
-        border-radius: 5px;
+        border-radius: 6px;
         cursor: pointer;
-        margin: 0 5px;
-        transition: all 0.3s;
+        transition: all 0.2s;
+        letter-spacing: 0.5px;
       }
-
-      #startBtn {
-        background-color: #667eea;
-        color: white;
-      }
-
-      #startBtn:hover:not(:disabled) {
-        background-color: #5568d3;
-      }
-
-      #stopBtn {
-        background-color: #ff6b6b;
-        color: white;
-      }
-
-      #stopBtn:hover:not(:disabled) {
-        background-color: #ee5a52;
-      }
-
-      #deleteAllBtn {
-        background-color: #e74c3c;
-        color: white;
-      }
-
-      #deleteAllBtn:hover:not(:disabled) {
-        background-color: #c0392b;
-      }
-
-      #deleteAllNotifBtn {
-        background-color: #f39c12;
-        color: white;
-      }
-
-      #deleteAllNotifBtn:hover:not(:disabled) {
-        background-color: #e67e22;
-      }
-
       button:disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: not-allowed;
       }
 
-      .video-container {
-        position: relative;
-        max-width: 640px;
+      #startBtn {
+        background: var(--accent);
+        color: #fff;
+      }
+      #startBtn:hover:not(:disabled) {
+        filter: brightness(1.15);
+      }
+      #stopBtn {
+        background: var(--danger);
+        color: #fff;
+      }
+      #stopBtn:hover:not(:disabled) {
+        filter: brightness(1.15);
+      }
+      #deleteAllBtn {
+        background: #c0392b;
+        color: #fff;
+      }
+      #deleteAllBtn:hover:not(:disabled) {
+        filter: brightness(1.15);
+      }
+      #deleteAllNotifBtn {
+        background: var(--warn);
+        color: #fff;
+      }
+      #deleteAllNotifBtn:hover:not(:disabled) {
+        filter: brightness(1.15);
+      }
+
+      /* ── Delete status ── */
+      #deleteStatus {
+        text-align: center;
+        padding: 10px;
+        margin-bottom: 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        display: none;
+      }
+      .success {
+        background: rgba(46, 204, 113, 0.15);
+        color: #2ecc71;
+        border: 1px solid rgba(46, 204, 113, 0.3);
+      }
+      .error {
+        background: rgba(231, 76, 60, 0.15);
+        color: #e74c3c;
+        border: 1px solid rgba(231, 76, 60, 0.3);
+      }
+
+      /* ── Main layout ── */
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        max-width: 860px;
         margin: 0 auto;
       }
 
+      /* ── Panel base ── */
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      }
+      .panel-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+
+      /* ── Camera ── */
       #video {
         display: block;
         width: 100%;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        background: #070810;
+        min-height: 200px;
       }
 
-      /* Stats Panel Below Camera */
-      .stats-panel {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px;
-        margin-top: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      }
-
+      /* ── Stats grid ── */
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
+        gap: 12px;
       }
 
-      .stat-item {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 15px;
+      .stat-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border);
         border-radius: 8px;
+        padding: 14px;
         text-align: center;
       }
-
       .stat-label {
-        font-size: 12px;
-        opacity: 0.8;
-        margin-bottom: 5px;
+        font-size: 10px;
+        letter-spacing: 1.5px;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        color: var(--muted);
+        margin-bottom: 6px;
       }
-
       .stat-value {
-        font-size: 28px;
-        font-weight: bold;
-        color: #fff;
+        font-family: var(--mono);
+        font-size: 30px;
+        font-weight: 400;
+        color: var(--text);
+        line-height: 1;
       }
-
-      .stat-value.highlight {
-        color: #ff6b6b;
+      .stat-unit {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .stat-value.danger {
+        color: var(--danger);
         animation: pulse 1s infinite;
+      }
+      .stat-value.good {
+        color: #2ecc71;
       }
 
       @keyframes pulse {
@@ -142,38 +234,91 @@
           opacity: 1;
         }
         50% {
-          opacity: 0.7;
+          opacity: 0.5;
         }
       }
 
-      .alert-badge {
+      /* ── Alert banner ── */
+      .alert-banner {
         grid-column: 1 / -1;
-        background: rgba(255, 107, 107, 0.2);
-        border: 2px solid #ff6b6b;
-        padding: 10px;
+        background: rgba(255, 107, 107, 0.1);
+        border: 1px solid rgba(255, 107, 107, 0.4);
         border-radius: 8px;
+        padding: 10px;
         text-align: center;
-        font-weight: bold;
-        font-size: 16px;
-        color: #ff6b6b;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--danger);
         display: none;
+        letter-spacing: 1px;
       }
-
-      .alert-badge.active {
+      .alert-banner.active {
         display: block;
         animation: alertBlink 1s infinite;
       }
-
       @keyframes alertBlink {
         0%,
         100% {
-          background: rgba(255, 107, 107, 0.2);
+          background: rgba(255, 107, 107, 0.1);
         }
         50% {
-          background: rgba(255, 107, 107, 0.4);
+          background: rgba(255, 107, 107, 0.25);
         }
       }
 
+      /* ── Sensor panel ── */
+      .sensor-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .sensor-card {
+        background: rgba(17, 153, 142, 0.08);
+        border: 1px solid rgba(17, 153, 142, 0.25);
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .sensor-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent2), #38ef7d);
+      }
+      .sensor-value {
+        font-family: var(--mono);
+        font-size: 38px;
+        color: #38ef7d;
+        line-height: 1;
+      }
+      .sensor-unit {
+        font-size: 13px;
+        color: rgba(56, 239, 125, 0.6);
+        margin-top: 4px;
+      }
+      #sensorStatus {
+        text-align: center;
+        margin-top: 12px;
+        font-size: 12px;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      .sensor-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent2);
+        margin-right: 6px;
+        animation: blink 1.5s infinite;
+      }
+
+      /* ── Notification toast ── */
       #notification {
         position: fixed;
         top: 20px;
@@ -181,31 +326,37 @@
         transform: translateX(-50%);
         z-index: 1000;
         min-width: 300px;
-        max-width: 500px;
+        max-width: 480px;
       }
-
-      #deleteStatus {
-        text-align: center;
-        padding: 10px;
-        margin-top: 10px;
-        border-radius: 8px;
-        font-size: 14px;
-        display: none;
+      .toast {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        padding: 14px 20px;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        animation: slideIn 0.3s ease-out;
       }
-
-      .success {
-        background-color: rgba(46, 204, 113, 0.2);
-        color: #2ecc71;
+      .toast-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 4px;
       }
-
-      .error {
-        background-color: rgba(231, 76, 60, 0.2);
-        color: #e74c3c;
+      .toast-msg {
+        font-size: 13px;
+        opacity: 0.85;
       }
-
+      .toast-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+      }
       @keyframes slideIn {
         from {
-          transform: translateY(-20px);
+          transform: translateY(-16px);
           opacity: 0;
         }
         to {
@@ -216,56 +367,82 @@
     </style>
   </head>
   <body>
-    <h2>🎥 Live Camera Stream</h2>
+    <header>
+      <div class="dot"></div>
+      <h1>🪱 WormCam Dashboard</h1>
+      <div class="dot"></div>
+    </header>
 
-    <!-- Status Display -->
     <div id="status">Initializing...</div>
 
-    <!-- Controls -->
     <div class="controls">
-      <button id="startBtn" disabled>▶️ Start Live Camera</button>
+      <button id="startBtn" disabled>▶️ Start Camera</button>
       <button id="stopBtn" disabled>⏹️ Stop</button>
-      <button id="deleteAllBtn">🗑️ Delete All Images</button>
-      <button id="deleteAllNotifBtn">🔔 Delete All Notifications</button>
+      <button id="deleteAllBtn">🗑️ Delete Images</button>
+      <button id="deleteAllNotifBtn">🔔 Delete Notifications</button>
     </div>
 
-    <!-- Delete Status -->
     <div id="deleteStatus"></div>
 
-    <!-- Video Container -->
-    <div class="video-container">
-      <!-- Camera Feed -->
-      <img id="video" alt="Camera feed will appear here" />
+    <div class="main-grid">
+      <!-- Camera feed -->
+      <div class="panel">
+        <div class="panel-title">📹 Live Camera Feed</div>
+        <img id="video" alt="Camera feed will appear here" />
+      </div>
 
-      <!-- Stats Panel Below Camera -->
-      <div class="stats-panel">
-        <div class="alert-badge" id="alertBadge">⚠️ HIGH DENSITY DETECTED!</div>
-
+      <!-- Detection stats -->
+      <div class="panel">
+        <div class="panel-title">🔬 Detection Stats</div>
         <div class="stats-grid">
-          <div class="stat-item">
+          <div class="alert-banner" id="alertBadge">
+            ⚠️ HIGH DENSITY DETECTED!
+          </div>
+
+          <div class="stat-card">
             <div class="stat-label">Larvae Count</div>
             <div class="stat-value" id="larvaeCount">0</div>
           </div>
 
-          <div class="stat-item">
-            <div class="stat-label">Density (cm²)</div>
+          <div class="stat-card">
+            <div class="stat-label">Density / cm²</div>
             <div class="stat-value" id="densityCm2">0.00</div>
           </div>
 
-          <div class="stat-item">
-            <div class="stat-label">Density (m²)</div>
+          <div class="stat-card">
+            <div class="stat-label">Density / m²</div>
             <div class="stat-value" id="densityM2">0.0</div>
           </div>
 
-          <div class="stat-item">
+          <div class="stat-card">
             <div class="stat-label">Status</div>
-            <div class="stat-value" id="statusIndicator">●</div>
+            <div class="stat-value good" id="statusIndicator">●</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Sensor data -->
+      <div class="panel">
+        <div class="panel-title">🌡️ Live Sensor Data — DHT22</div>
+        <div class="sensor-grid">
+          <div class="sensor-card">
+            <div class="stat-label">Temperature</div>
+            <div class="sensor-value" id="tempValue">--</div>
+            <div class="sensor-unit">°C</div>
+          </div>
+          <div class="sensor-card">
+            <div class="stat-label">Humidity</div>
+            <div class="sensor-value" id="humidValue">--</div>
+            <div class="sensor-unit">%</div>
+          </div>
+        </div>
+        <div id="sensorStatus">
+          <span class="sensor-dot"></span>Waiting for sensor data...
         </div>
       </div>
     </div>
 
-    <!-- Notification Area -->
+    <!-- Notification toast -->
     <div id="notification"></div>
 
     <script src="/static/app.js"></script>
