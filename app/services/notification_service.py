@@ -29,7 +29,7 @@ class NotificationService:
     NOTIFICATION_COOLDOWN = timedelta(minutes=30)
 
     last_hourly_report_time = None
-    HOURLY_REPORT_INTERVAL = timedelta(seconds=10)
+    HOURLY_REPORT_INTERVAL = timedelta(hours=1)
 
     # ── Singleton monitoring task ──────────────────────────────────────────
     _monitoring_task: asyncio.Task | None = None
