@@ -16,7 +16,7 @@ class NotificationService:
 
     # Load YOLO model
     BASE_DIR = Path(__file__).resolve().parents[1]
-    MODEL_PATH = BASE_DIR / "yolo" / "models" / "trained" / "segmentv3.pt"
+    MODEL_PATH = BASE_DIR / "yolo" / "models" / "trained" / "worms-seg.pt"
     model = YOLO(str(MODEL_PATH))
 
     # Constants

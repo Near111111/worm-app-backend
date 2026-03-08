@@ -5,7 +5,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
-MODEL_PATH = BASE_DIR / "models" / "trained" / "segmentv3.pt"
+MODEL_PATH = BASE_DIR / "models" / "trained" / "worms-seg.pt"
 
 model = YOLO(str(MODEL_PATH))
 

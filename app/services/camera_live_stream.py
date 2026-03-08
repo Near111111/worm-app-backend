@@ -22,7 +22,7 @@ class LiveStreamService:
     
     # Load YOLO model once
     BASE_DIR = Path(__file__).resolve().parents[2]
-    MODEL_PATH = BASE_DIR / "app" / "yolo" / "models" / "trained" / "wormv11-seg-final.pt"
+    MODEL_PATH = BASE_DIR / "app" / "yolo" / "models" / "trained" / "worms-seg.pt"
     VIDEO_PATH = BASE_DIR / "app" / "yolo" / "videos" / "worm-vid.MOV"
     model = YOLO(str(MODEL_PATH))
     

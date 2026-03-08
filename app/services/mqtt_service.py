@@ -7,8 +7,8 @@ from datetime import datetime
 # MQTT Broker Configuration
 BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC_TEMP = "esp32/dht22/temperature"
-TOPIC_HUM  = "esp32/dht22/humidity"
+TOPIC_TEMP = "superworms-2025/device1/temp"
+TOPIC_HUM  = "superworms-2025/device1/humidity"
 CLIENT_ID  = "fastapi_larvae_monitor_98765"
 
 

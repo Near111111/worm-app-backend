@@ -7,7 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 # Model path (already relative)
-MODEL_PATH = BASE_DIR / "models" / "trained" / "segmentv3.pt"
+MODEL_PATH = BASE_DIR / "models" / "trained" / "worms-seg.pt"
 
 # ✅ Video path (NOW RELATIVE)
 VIDEO_PATH = BASE_DIR / "videos" / "worm-vid.mov"
