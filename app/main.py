@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from zeroconf import ServiceInfo, Zeroconf
+from app.routes.session_route import router as session_router
 
 from app.services.mqtt_service import MQTTService
 from app.services.notification_service import NotificationService  # ← NEW
@@ -78,9 +79,16 @@ async def lifespan(app: FastAPI):
     MQTTService.stop()
 
     if zeroconf and service_info:
-        zeroconf.unregister_service(service_info)
-        zeroconf.close()
-        print("\n🛑 mDNS service unregistered")
+        try:
+            zeroconf.unregister_service(service_info)
+            zeroconf.close()
+            print("\n🛑 mDNS service unregistered")
+        except Exception as e:
+            print(f"⚠️ mDNS cleanup failed (safe to ignore): {e}")
+            try:
+                zeroconf.close()
+            except Exception:
+                pass
 
 
 app = FastAPI(lifespan=lifespan)
@@ -117,6 +125,7 @@ app.include_router(delete_images_router)
 app.include_router(camera_router)
 app.include_router(notify_router)
 app.include_router(sensor_router)
+app.include_router(session_router)
 
 if __name__ == "__main__":
     import uvicorn
