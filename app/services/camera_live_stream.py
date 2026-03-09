@@ -27,7 +27,7 @@ class LiveStreamService:
     model = YOLO(str(MODEL_PATH))
     
     # Constants
-    ROI_AREA_CM2 = 413
+    ROI_AREA_CM2 = 429
     ROI_AREA_M2 = ROI_AREA_CM2 / 10000
     AVG_WORM_AREA = 386
     DENSITY_THRESHOLD = 1.25
