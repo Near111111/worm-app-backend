@@ -5,14 +5,13 @@ from app.repositories.previous_notification_dao import PreviousNotificationDAO
 from app.repositories.saved_images_dao import SavedImagesDAO
 from app.services.image_service import ImageService
 from app.services.mqtt_service import MQTTService
-import cv2
 import numpy as np
 from ultralytics import YOLO
 from pathlib import Path
+from app.core.camera_manager import camera  # ← Shared camera singleton
 
 
 class NotificationService:
-    camera_cap = cv2.VideoCapture(0)
 
     # Load YOLO model
     BASE_DIR = Path(__file__).resolve().parents[1]
@@ -41,19 +40,16 @@ class NotificationService:
 
     @classmethod
     def register_client(cls, websocket):
-        """Add a newly connected WS client."""
         cls.active_clients.add(websocket)
         print(f"🔔 Notification client registered. Total: {len(cls.active_clients)}")
 
     @classmethod
     def unregister_client(cls, websocket):
-        """Remove a disconnected WS client."""
         cls.active_clients.discard(websocket)
         print(f"🔴 Notification client removed. Total: {len(cls.active_clients)}")
 
     @classmethod
     async def broadcast(cls, notification: dict):
-        """Send notification JSON to ALL connected clients."""
         message = json.dumps(notification)
         print(f"📤 Broadcasting notification: {message}")
 
@@ -71,8 +67,10 @@ class NotificationService:
 
     @staticmethod
     def check_larvae_density():
-        ret, frame = NotificationService.camera_cap.read()
+        # Use shared camera singleton — never dies
+        ret, frame = camera.read()
         if not ret:
+            print("⚠️ Could not read frame from camera")
             return False, 0, 0
 
         results = NotificationService.model(frame, imgsz=640, conf=0.4, verbose=False)[0]
@@ -101,7 +99,6 @@ class NotificationService:
     @classmethod
     async def _send_and_persist(cls, title, message, larvae_count=0, density=0,
                                 include_sensor=False, report_type="density_alert"):
-        """Build notification, broadcast it, then save to DB + snapshot."""
         sensor = MQTTService.get_sensor_data()
 
         notification = {
@@ -117,23 +114,21 @@ class NotificationService:
             notification["temperature"] = sensor["temperature"]
             notification["humidity"] = sensor["humidity"]
 
-        # Broadcast to all WS clients
         await cls.broadcast(notification)
 
-        # Persist
         try:
             PreviousNotificationDAO.save(notification)
         except Exception as e:
             print(f"❌ Failed to save notification: {e}")
 
         try:
-            snapshot_url = ImageService.capture_and_upload_snapshot(cls.camera_cap)
+            # Pass shared camera to image service
+            snapshot_url = ImageService.capture_and_upload_snapshot(camera)
             if snapshot_url:
                 SavedImagesDAO.save(snapshot_url)
         except Exception as e:
             print(f"❌ Failed to save snapshot: {e}")
 
-        # Update cooldown timestamps
         if report_type == "density_alert":
             cls.last_notification_time = datetime.now()
         elif report_type == "hourly_report":
@@ -157,12 +152,6 @@ class NotificationService:
 
     @classmethod
     async def _monitoring_loop(cls):
-        """
-        Runs ONCE as a background task (singleton).
-        Checks density every 30 s.
-        Hourly report  → every 1 hour  (regardless of density)
-        Density alert  → every 30 min  (only when HIGH)
-        """
         print("🔁 Monitoring loop started (singleton)")
         try:
             while True:
@@ -188,7 +177,7 @@ class NotificationService:
                         include_sensor=True,
                         report_type="hourly_report",
                     )
-                    print("📊 Hourly report sent. Next report in 1 hour.")
+                    print("📊 Hourly report sent. Next in 1 hour.")
 
                 # --- DENSITY ALERT ---
                 if is_high:
@@ -202,7 +191,7 @@ class NotificationService:
                             include_sensor=False,
                             report_type="density_alert",
                         )
-                        print("✅ Density alert sent. Next alert in 30 minutes.")
+                        print("✅ Density alert sent. Next in 30 minutes.")
                     else:
                         remaining = cls.NOTIFICATION_COOLDOWN - (
                             datetime.now() - cls.last_notification_time
@@ -218,10 +207,6 @@ class NotificationService:
 
     @classmethod
     def ensure_monitoring_started(cls):
-        """
-        Call once (e.g. from lifespan or first WS connect).
-        Starts the background loop only if not already running.
-        """
         if cls._monitoring_task is None or cls._monitoring_task.done():
             cls._monitoring_task = asyncio.ensure_future(cls._monitoring_loop())
             print("✅ Monitoring task created")
